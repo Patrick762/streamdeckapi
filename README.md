@@ -1,3 +1,5 @@
+[![PyPI version](https://badge.fury.io/py/streamdeckapi.svg)](https://badge.fury.io/py/streamdeckapi)
+
 # streamdeckapi
 Stream Deck API Library for Home Assistant Stream Deck Integration
 
