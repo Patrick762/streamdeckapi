@@ -1,2 +1,7 @@
 # streamdeckapi
-Stream Deck API Library
+Stream Deck API Library for Home Assistant Stream Deck Integration
+
+Only compatible with separate Stream Deck Plugin
+
+## Dependencies
+- [websockets](https://pypi.org/project/websockets/) 11.0.2
