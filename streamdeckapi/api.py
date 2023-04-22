@@ -28,6 +28,7 @@ class StreamDeckApi:
         on_button_release: Callable[[str], None] | None = None,
         on_status_update: Callable[[SDInfo], None] | None = None,
         on_ws_message: Callable[[SDWebsocketMessage], None] | None = None,
+        on_ws_connect: Callable[[], None] | None = None,
     ) -> None:
         """Init Stream Deck API object."""
         self._host = host
@@ -35,6 +36,7 @@ class StreamDeckApi:
         self._on_button_release = on_button_release
         self._on_status_update = on_status_update
         self._on_ws_message = on_ws_message
+        self._on_ws_connect = on_ws_connect
         self._loop = asyncio.get_event_loop()
         self._running = False
         self._task: asyncio.Task | None = None
@@ -90,10 +92,10 @@ class StreamDeckApi:
         try:
             res = requests.post(url, data, headers=headers, timeout=5)
         except requests.RequestException:
-            _LOGGER.error("Error sending data to Stream Deck Plugin (exception)")
+            _LOGGER.debug("Error sending data to Stream Deck Plugin (exception)")
             return None
         if res.status_code != 200:
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Error sending data to Stream Deck Plugin (%s). Is the button currently visible?",
                 res.reason,
             )
@@ -114,12 +116,12 @@ class StreamDeckApi:
         try:
             rjson = res.json()
         except requests.JSONDecodeError:
-            _LOGGER.error("Error decoding response from %s", self._info_url)
+            _LOGGER.debug("Error decoding response from %s", self._info_url)
             return None
         try:
             info = SDInfo(rjson)
         except KeyError:
-            _LOGGER.error("Error parsing response from %s to SDInfo", self._info_url)
+            _LOGGER.debug("Error parsing response from %s to SDInfo", self._info_url)
             return None
         return info
 
@@ -130,7 +132,7 @@ class StreamDeckApi:
         if res is None or res.status_code != 200:
             return None
         if res.headers.get("Content-Type", "") != "image/svg+xml":
-            _LOGGER.error("Invalid content type received from %s", url)
+            _LOGGER.debug("Invalid content type received from %s", url)
             return None
         return res.text
 
@@ -178,12 +180,12 @@ class StreamDeckApi:
         try:
             datajson = json.loads(msg)
         except json.JSONDecodeError:
-            _LOGGER.warning("Method _on_message: Websocket message couldn't get parsed")
+            _LOGGER.debug("Method _on_message: Websocket message couldn't get parsed")
             return
         try:
             data = SDWebsocketMessage(datajson)
         except KeyError:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "Method _on_message: Websocket message couldn't get parsed to SDWebsocketMessage"
             )
             return
@@ -212,9 +214,11 @@ class StreamDeckApi:
         while self._running:
             info = await self.get_info()
             if isinstance(info, SDInfo):
-                _LOGGER.info("Method _websocket_loop: Streamdeck online")
+                _LOGGER.debug("Method _websocket_loop: Streamdeck online")
                 try:
                     async with connect(self._websocket_url) as websocket:
+                        if self._on_ws_connect is not None:
+                            self._on_ws_connect()
                         try:
                             while self._running:
                                 data = await asyncio.wait_for(
@@ -222,17 +226,17 @@ class StreamDeckApi:
                                 )
                                 self._on_message(data)
                             await websocket.close()
-                            _LOGGER.info("Method _websocket_loop: Websocket closed")
+                            _LOGGER.debug("Method _websocket_loop: Websocket closed")
                         except WebSocketException:
-                            _LOGGER.warning(
+                            _LOGGER.debug(
                                 "Method _websocket_loop: Websocket client crashed. Restarting it"
                             )
                         except asyncio.TimeoutError:
-                            _LOGGER.warning(
+                            _LOGGER.debug(
                                 "Method _websocket_loop: Websocket client timed out. Restarting it"
                             )
                 except WebSocketException:
-                    _LOGGER.warning(
+                    _LOGGER.debug(
                         "Method _websocket_loop: Websocket client not connecting. Restarting it"
                     )
 
