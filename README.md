@@ -7,3 +7,9 @@ Only compatible with separate [Stream Deck Plugin](https://github.com/Patrick762
 
 ## Dependencies
 - [websockets](https://pypi.org/project/websockets/) 11.0.2
+
+
+## Server
+This library also contains a server to use the streamdeck with linux or without the official Stream Deck Software.
+
+For this to work, the LibUSB HIDAPI is required. [Installation instructions](https://python-elgato-streamdeck.readthedocs.io/en/stable/pages/backend_libusb_hidapi.html)

@@ -9,11 +9,9 @@ import requests
 from websockets.client import connect
 from websockets.exceptions import WebSocketException
 
-from .types import SDInfo, SDWebsocketMessage
+from streamdeckapi.const import PLUGIN_ICON, PLUGIN_INFO, PLUGIN_PORT
 
-_PLUGIN_PORT = 6153
-_PLUGIN_INFO = "/sd/info"
-_PLUGIN_ICON = "/sd/icon"
+from .types import SDInfo, SDWebsocketMessage
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,17 +51,17 @@ class StreamDeckApi:
     @property
     def _info_url(self) -> str:
         """URL to info endpoint."""
-        return f"http://{self._host}:{_PLUGIN_PORT}{_PLUGIN_INFO}"
+        return f"http://{self._host}:{PLUGIN_PORT}{PLUGIN_INFO}"
 
     @property
     def _icon_url(self) -> str:
         """URL to icon endpoint."""
-        return f"http://{self._host}:{_PLUGIN_PORT}{_PLUGIN_ICON}/"
+        return f"http://{self._host}:{PLUGIN_PORT}{PLUGIN_ICON}/"
 
     @property
     def _websocket_url(self) -> str:
         """URL to websocket."""
-        return f"ws://{self._host}:{_PLUGIN_PORT}"
+        return f"ws://{self._host}:{PLUGIN_PORT}"
 
     #
     #   API Methods
