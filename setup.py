@@ -21,7 +21,7 @@ setup(
     long_description=long_description,
     url="https://github.com/Patrick762/streamdeckapi",
     packages=find_packages(),
-    install_requires=["websockets==11.0.2",
+    install_requires=["requests==2.28.2", "websockets==11.0.2",
                       "streamdeck==0.9.3", "pillow>=9.4.0,<10.0.0"],
     keywords=[],
     entry_points={
