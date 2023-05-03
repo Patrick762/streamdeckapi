@@ -2,26 +2,82 @@
 
 import aiohttp
 import asyncio
-from aiohttp import web, WSCloseCode
+import platform
+from jsonpickle import encode
+from aiohttp import web
 
 # from StreamDeck.DeviceManager import DeviceManager
 from streamdeckapi.const import PLUGIN_ICON, PLUGIN_INFO, PLUGIN_PORT
+from streamdeckapi.types import SDApplication, SDButton, SDDevice
+
+application: SDApplication = SDApplication(
+    {
+        "font": "",
+        "language": "",
+        "platform": platform.system(),
+        "platformVersion": platform.version(),
+        "version": "0.0.1",
+    }
+)
+devices: list[SDDevice] = []
+buttons: dict[str, SDButton] = {}
+
+# Examples
+devices.append(
+    SDDevice(
+        {
+            "id": "08B602C026FC8D1989FDF80EB8658612",
+            "name": "Stream Deck",
+            "size": {"columns": 5, "rows": 3},
+            "type": 0,
+        }
+    )
+)
+buttons["547686796543735"] = SDButton(
+    {
+        "uuid": "kind-sloth-97",
+        "device": "08B602C026FC8D1989FDF80EB8658612",
+        "position": {"x": 0, "y": 0},
+        "svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72"><rect width="72" height="72" fill="#000" /><text text-anchor="middle" x="35" y="15" fill="#fff" font-size="12">off</text><text text-anchor="middle" x="35" y="65" fill="#fff" font-size="12">Philips Hue Huelight</text><g transform="translate(16, 12) scale(0.5)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -512 512 512"><path fill="#e00" d="M256 -405Q215 -405 181 -385Q147 -365 127 -331Q107 -297 107 -256Q107 -219 124 -186.5Q141 -154 171 -134V-85Q171 -76 177 -70Q183 -64 192 -64H320Q329 -64 335 -70Q341 -76 341 -85V-134Q371 -154 388 -186.5Q405 -219 405 -256Q405 -297 385 -331Q365 -365 331 -385Q297 -405 256 -405ZM192 0Q192 9 198 15Q204 21 213 21H299Q308 21 314 15Q320 9 320 0V-21H192Z"/></svg></g></svg>',
+    }
+)
 
 
 async def api_info_handler(request: web.Request):
-    return web.Response(text="Info")
+    json_data = encode(
+        {"devices": devices, "application": application, "buttons": buttons},
+        unpicklable=False,
+    )
+    return web.Response(text=json_data, content_type="application/json")
 
 
 async def api_icon_get_handler(request: web.Request):
     btnId = request.match_info["btnId"]
-    return web.Response(text="Icon get")
+    for _, btn in buttons.items():
+        if btn.uuid != btnId:
+            continue
+        return web.Response(text=btn.svg, content_type="image/svg+xml")
+    return web.Response(status=404, text="Button not found")
 
 
 async def api_icon_set_handler(request: web.Request):
     btnId = request.match_info["btnId"]
+    if not request.has_body:
+        return web.Response(status=422, text="No data in request")
     body = await request.text()
     print(body)
-    return web.Response(text="Icon set")
+    if not body.startswith("<svg"):
+        return web.Response(status=422, text="Only svgs are supported")
+    btnKey = None
+    for key, btn in buttons.items():
+        if btn.uuid == btnId:
+            btnKey = key
+    if btnKey is None:
+        return web.Response(status=404, text="Button not found")
+
+    buttons[btnKey].svg = body
+
+    return web.Response(text="Icon changed")
 
 
 async def websocket_handler(request: web.Request):

@@ -27,6 +27,7 @@ setup(
         "websockets==11.0.2",
         "aiohttp==3.8.4",
         "human-readable-ids==0.1.3",
+        "jsonpickle==3.0.1",
         "streamdeck==0.9.3",
         "pillow>=9.4.0,<10.0.0",
     ],
