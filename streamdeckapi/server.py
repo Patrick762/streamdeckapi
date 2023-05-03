@@ -33,7 +33,7 @@ devices.append(
         }
     )
 )
-buttons["547686796543735"] = SDButton(
+buttons["576e8e7fc6ac2a37fa436ed3dc76652b"] = SDButton(
     {
         "uuid": "kind-sloth-97",
         "device": "08B602C026FC8D1989FDF80EB8658612",
