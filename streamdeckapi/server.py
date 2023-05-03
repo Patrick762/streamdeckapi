@@ -1,48 +1,65 @@
 """Stream Deck API Server."""
 
-from StreamDeck.DeviceManager import DeviceManager
+import aiohttp
+import asyncio
+from aiohttp import web, WSCloseCode
+
+# from StreamDeck.DeviceManager import DeviceManager
 from streamdeckapi.const import PLUGIN_ICON, PLUGIN_INFO, PLUGIN_PORT
 
-# Prints diagnostic information about a given StreamDeck.
-def print_deck_info(index, deck):
-    image_format = deck.key_image_format()
 
-    flip_description = {
-        (False, False): "not mirrored",
-        (True, False): "mirrored horizontally",
-        (False, True): "mirrored vertically",
-        (True, True): "mirrored horizontally/vertically",
-    }
+async def api_info_handler(request: web.Request):
+    return web.Response(text="Info")
 
-    print("Deck {} - {}.".format(index, deck.deck_type()))
-    print("\t - ID: {}".format(deck.id()))
-    print("\t - Serial: '{}'".format(deck.get_serial_number()))
-    print("\t - Firmware Version: '{}'".format(deck.get_firmware_version()))
-    print("\t - Key Count: {} (in a {}x{} grid)".format(
-        deck.key_count(),
-        deck.key_layout()[0],
-        deck.key_layout()[1]))
-    if deck.is_visual():
-        print("\t - Key Images: {}x{} pixels, {} format, rotated {} degrees, {}".format(
-            image_format['size'][0],
-            image_format['size'][1],
-            image_format['format'],
-            image_format['rotation'],
-            flip_description[image_format['flip']]))
-    else:
-        print("\t - No Visual Output")
 
-def start():
-    streamdecks = DeviceManager().enumerate()
+async def api_icon_get_handler(request: web.Request):
+    btnId = request.match_info["btnId"]
+    return web.Response(text="Icon get")
 
-    print("Found {} Stream Deck(s).\n".format(len(streamdecks)))
 
+async def api_icon_set_handler(request: web.Request):
+    btnId = request.match_info["btnId"]
+    body = await request.text()
+    print(body)
+    return web.Response(text="Icon set")
+
+
+async def websocket_handler(request: web.Request):
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    async for msg in ws:
+        if msg.type == aiohttp.WSMsgType.TEXT:
+            if msg.data == "close":
+                await ws.close()
+            else:
+                await ws.send_str("some websocket message payload")
+        elif msg.type == aiohttp.WSMsgType.ERROR:
+            print("ws connection closed with exception %s" % ws.exception())
+    return ws
+
+
+def create_runner():
+    app = web.Application()
+    app.add_routes(
+        [
+            web.get("/", websocket_handler),
+            web.get(PLUGIN_INFO, api_info_handler),
+            web.get(PLUGIN_ICON + "/{btnId}", api_icon_get_handler),
+            web.post(PLUGIN_ICON + "/{btnId}", api_icon_set_handler),
+        ]
+    )
+    return web.AppRunner(app)
+
+
+async def start_server(host="0.0.0.0", port=PLUGIN_PORT):
+    runner = create_runner()
+    await runner.setup()
+    site = web.TCPSite(runner, host, port)
+    await site.start()
     print("Started Stream Deck API server on port", PLUGIN_PORT)
 
-    for index, deck in enumerate(streamdecks):
-        deck.open()
-        deck.reset()
 
-        print_deck_info(index, deck)
-
-        deck.close()
+def start():
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(start_server())
+    loop.run_forever()
