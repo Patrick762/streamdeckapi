@@ -41,33 +41,18 @@ application: SDApplication = SDApplication(
 devices: list[SDDevice] = []
 buttons: dict[str, SDButton] = {}
 
-# Examples
-# devices.append(
-#    SDDevice(
-#        {
-#            "id": "08B602C026FC8D1989FDF80EB8658612",
-#            "name": "Stream Deck",
-#            "size": {"columns": 5, "rows": 3},
-#            "type": 0,
-#        }
-#    )
-# )
-# buttons["576e8e7fc6ac2a37fa436ed3dc76652b"] = SDButton(
-#    {
-#        "uuid": "kind-sloth-97",
-#        "device": "08B602C026FC8D1989FDF80EB8658612",
-#        "position": {"x": 0, "y": 0},
-#        "svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72"><rect width="72" height="72" fill="#000" /><text text-anchor="middle" x="35" y="15" fill="#fff" font-size="12">off</text><text text-anchor="middle" x="35" y="65" fill="#fff" font-size="12">Philips Hue Huelight</text><g transform="translate(16, 12) scale(0.5)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -512 512 512"><path fill="#e00" d="M256 -405Q215 -405 181 -385Q147 -365 127 -331Q107 -297 107 -256Q107 -219 124 -186.5Q141 -154 171 -134V-85Q171 -76 177 -70Q183 -64 192 -64H320Q329 -64 335 -70Q341 -76 341 -85V-134Q371 -154 388 -186.5Q405 -219 405 -256Q405 -297 385 -331Q365 -365 331 -385Q297 -405 256 -405ZM192 0Q192 9 198 15Q204 21 213 21H299Q308 21 314 15Q320 9 320 0V-21H192Z"/></svg></g></svg>',
-#    }
-# )
-
 
 async def api_info_handler(
     request: web.Request,
-):  # FIXME: can result in unparseable json (different keys, f.ex. x - x_pos)
+):  # FIXME: unparseable json (x -> x_pos, y -> y_pos, platformVersion -> platform_version)
     json_data = encode(
         {"devices": devices, "application": application, "buttons": buttons},
         unpicklable=False,
+    )
+    if not isinstance(json_data, str):
+        return web.Response(status=500, text="jsonpickle error")
+    json_data = json_data.replace('"x_pos"', '"x"').replace('"y_pos"', '"y"').replace(
+        '"platform_version"', '"platformVersion"'
     )
     return web.Response(text=json_data, content_type="application/json")
 
@@ -185,6 +170,7 @@ def init_all():
                 }
             )
 
+        deck.reset()
         # TODO: write svg to buttons
 
         deck.set_key_callback(on_key_change)
