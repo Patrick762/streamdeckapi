@@ -30,6 +30,7 @@ setup(
         "jsonpickle==3.0.1",
         "streamdeck==0.9.3",
         "pillow>=9.4.0,<10.0.0",
+        "svglib==1.5.1",
     ],
     keywords=[],
     entry_points={

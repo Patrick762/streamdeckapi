@@ -10,6 +10,9 @@ Only compatible with separate [Stream Deck Plugin](https://github.com/Patrick762
 
 
 ## Server
-This library also contains a server to use the streamdeck with linux or without the official Stream Deck Software.
+This library also contains a server to use the streamdeck with Linux or without the official Stream Deck Software.
 
-For this to work, the LibUSB HIDAPI is required. [Installation instructions](https://python-elgato-streamdeck.readthedocs.io/en/stable/pages/backend_libusb_hidapi.html)
+For this to work, the following software is required:
+
+- LibUSB HIDAPI [Installation instructions](https://python-elgato-streamdeck.readthedocs.io/en/stable/pages/backend_libusb_hidapi.html)
+- cairo [Installation instructions for Windows](https://stackoverflow.com/a/73913080)
