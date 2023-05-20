@@ -22,6 +22,7 @@ from streamdeckapi.types import SDApplication, SDButton, SDButtonPosition, SDDev
 # TODO: MDI Icons not showing
 # TODO: Text too small, positioning off
 # TODO: Websocket broadcast not working yet
+# TODO: SSDP server
 
 
 DEFAULT_ICON = re.sub(
