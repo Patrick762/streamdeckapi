@@ -13,16 +13,14 @@ from aiohttp import web
 from StreamDeck.DeviceManager import DeviceManager
 from StreamDeck.Devices.StreamDeck import StreamDeck
 from StreamDeck.ImageHelpers import PILHelper
-from svglib.svglib import svg2rlg
+import cairosvg
 from PIL import Image
+from ssdpy import SSDPServer
 
-from streamdeckapi.const import PLUGIN_ICON, PLUGIN_INFO, PLUGIN_PORT
+from streamdeckapi.const import PLUGIN_ICON, PLUGIN_INFO, PLUGIN_PORT, SD_SSDP
 from streamdeckapi.types import SDApplication, SDButton, SDButtonPosition, SDDevice
 
-# TODO: MDI Icons not showing
-# TODO: Text too small, positioning off
 # TODO: Websocket broadcast not working yet
-# TODO: SSDP server
 
 
 DEFAULT_ICON = re.sub(
@@ -292,13 +290,14 @@ def update_button_icon(uuid: str, svg: str):
 
 def set_icon(deck: StreamDeck, key: int, svg: str):
     """Draw an icon to the button."""
-    svg_io = io.StringIO(svg)
-    drawing = svg2rlg(svg_io)
-    png_string = drawing.asString("png")
-    png_bytes = io.BytesIO(png_string)
+    png_bytes = io.BytesIO()
+    cairosvg.svg2png(svg.encode("utf-8"), write_to=png_bytes)
+    
+    # Debug
+    cairosvg.svg2png(svg.encode("utf-8"), write_to=f"icon_{key}.png")
 
     icon = Image.open(png_bytes)
-    image = PILHelper.create_scaled_image(deck, icon, margins=[0, 0, 20, 0])
+    image = PILHelper.create_scaled_image(deck, icon)
 
     deck.set_key_image(key, PILHelper.to_native_format(deck, image))
 
@@ -357,3 +356,7 @@ def start():
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_server())
     loop.run_forever()
+
+    # TODO: SSDP server
+    server = SSDPServer(SD_SSDP)
+    server.serve_forever()
