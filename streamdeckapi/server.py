@@ -55,6 +55,7 @@ application: SDApplication = SDApplication(
     }
 )
 devices: list[SDDevice] = []
+websocket_connections: list[web.WebSocketResponse] = []
 
 #
 #   Database
@@ -70,13 +71,15 @@ table_cursor.execute("""
                    x integer,
                    y integer,
                    svg text
-                )""")
+                );""")
 table_cursor.execute("""
                 CREATE TABLE IF NOT EXISTS button_states(
                    key integer PRIMARY KEY,
                    state integer,
                    state_update text
-                )""")
+                );""")
+table_cursor.execute("DELETE FROM button_states;")
+database_first.commit()
 table_cursor.close()
 database_first.close()
 
@@ -290,8 +293,14 @@ async def websocket_handler(request: web.Request):
     """Handle websocket."""
     web_socket = web.WebSocketResponse()
     await web_socket.prepare(request)
+
+    await web_socket.send_str(encode({"event": "connected", "args": {}}))
+
+    websocket_connections.append(web_socket)
+
     async for msg in web_socket:
         if msg.type == aiohttp.WSMsgType.TEXT:
+            print(msg.data)
             if msg.data == "close":
                 await web_socket.close()
             else:
@@ -299,13 +308,16 @@ async def websocket_handler(request: web.Request):
         elif msg.type == aiohttp.WSMsgType.ERROR:
             print(
                 f"Websocket connection closed with exception {web_socket.exception()}")
+
+    websocket_connections.pop(web_socket)
     return web_socket
 
 
-# TODO: Websocket broadcast not working yet
 def websocket_broadcast(message: str):
     """Send a message to each websocket client."""
     print(f"BROADCAST: {message}")
+    for connection in websocket_connections:
+        asyncio.run(connection.send_str(message))
 
 
 #
@@ -472,3 +484,5 @@ def start():
     # TODO: SSDP server
     server = SSDPServer(SD_SSDP)
     server.serve_forever()
+
+    # TODO: 10 second broadcast with status
