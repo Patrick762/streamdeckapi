@@ -16,3 +16,5 @@ For this to work, the following software is required:
 
 - LibUSB HIDAPI [Installation instructions](https://python-elgato-streamdeck.readthedocs.io/en/stable/pages/backend_libusb_hidapi.html)
 - cairo [Installation instructions for Windows](https://stackoverflow.com/a/73913080)
+
+The event `doubleTap` is not working with this server software.
