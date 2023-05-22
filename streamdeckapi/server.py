@@ -7,6 +7,7 @@ import platform
 import sqlite3
 import base64
 from datetime import datetime
+from multiprocessing import Process
 import aiohttp
 import human_readable_ids as hri
 from jsonpickle import encode
@@ -303,21 +304,19 @@ async def websocket_handler(request: web.Request):
             print(msg.data)
             if msg.data == "close":
                 await web_socket.close()
-            else:
-                await web_socket.send_str("some websocket message payload")
         elif msg.type == aiohttp.WSMsgType.ERROR:
             print(
                 f"Websocket connection closed with exception {web_socket.exception()}")
 
-    websocket_connections.pop(web_socket)
+    websocket_connections.remove(web_socket)
     return web_socket
 
 
-def websocket_broadcast(message: str):
+async def websocket_broadcast(message: str):
     """Send a message to each websocket client."""
-    print(f"BROADCAST: {message}")
+    print(f"BROADCAST to {len(websocket_connections)} clients: {message}")
     for connection in websocket_connections:
-        asyncio.run(connection.send_str(message))
+        await connection.send_str(message)
 
 
 #
@@ -339,7 +338,7 @@ def create_runner():
     return web.AppRunner(app)
 
 
-async def start_server(host="0.0.0.0", port=PLUGIN_PORT):
+async def start_server_async(host: str = "0.0.0.0", port: int = PLUGIN_PORT):
     """Start API server."""
     runner = create_runner()
     await runner.setup()
@@ -353,17 +352,17 @@ def get_position(deck: StreamDeck, key: int) -> SDButtonPosition:
     return SDButtonPosition({"x": int(key / deck.KEY_COLS), "y": key % deck.KEY_COLS})
 
 
-def on_key_change(_: StreamDeck, key: int, state: bool):
+async def on_key_change(_: StreamDeck, key: int, state: bool):
     """Handle key change callbacks."""
     button = get_button(key)
     if button is None:
         return
 
     if state is True:
-        websocket_broadcast(encode(
+        await websocket_broadcast(encode(
             {"event": "keyDown", "args": button.uuid}))
     else:
-        websocket_broadcast(encode(
+        await websocket_broadcast(encode(
             {"event": "keyUp", "args": button.uuid}))
 
     now = datetime.now()
@@ -380,14 +379,14 @@ def on_key_change(_: StreamDeck, key: int, state: bool):
     diff = now - last_update_datetime
 
     if last_state is True and state is False and diff.seconds < LONG_PRESS_SECONDS:
-        websocket_broadcast(
+        await websocket_broadcast(
             encode({"event": "singleTap", "args": button.uuid}))
         write_button_state(key, state, now.strftime(DATETIME_FORMAT))
         return
 
     # TODO: Work with timer instead
     if last_state is True and state is False and diff.seconds >= LONG_PRESS_SECONDS:
-        websocket_broadcast(
+        await websocket_broadcast(
             encode({"event": "longPress", "args": button.uuid}))
         write_button_state(key, state, now.strftime(DATETIME_FORMAT))
         return
@@ -470,19 +469,27 @@ def init_all():
         for key, button in get_buttons().items():
             set_icon(deck, key, button.svg)
 
-        deck.set_key_callback(on_key_change)
+        deck.set_key_callback_async(on_key_change)
+
+
+def start_ssdp_server():
+    """Start SSDP server."""
+    print("Starting SSDP server ...")
+    server = SSDPServer(SD_SSDP)
+    server.serve_forever()
 
 
 def start():
     """Entrypoint."""
     init_all()
 
+    # SSDP server
+    ssdp_server = Process(target=start_ssdp_server)
+    ssdp_server.start()
+
+    # API server
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(start_server())
+    loop.run_until_complete(start_server_async())
     loop.run_forever()
 
-    # TODO: SSDP server
-    server = SSDPServer(SD_SSDP)
-    server.serve_forever()
-
-    # TODO: 10 second broadcast with status
+    ssdp_server.join()
