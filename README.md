@@ -3,7 +3,7 @@
 # streamdeckapi
 Stream Deck API Library for Home Assistant Stream Deck Integration
 
-Only compatible with separate [Stream Deck Plugin](https://github.com/Patrick762/streamdeckapi-plugin)
+Only compatible with separate [Stream Deck Plugin](https://github.com/Patrick762/streamdeckapi-plugin) or the bundled server.
 
 ## Requirements
 - Python 3.10 or higher

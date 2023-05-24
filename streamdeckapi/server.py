@@ -319,6 +319,30 @@ async def websocket_broadcast(message: str):
         await connection.send_str(message)
 
 
+async def broadcast_status():
+    """Broadcast the current status of the streamdeck."""
+
+    # Collect data
+    data = {
+        "event": "status",
+        "args": {
+            "devices": devices,
+            "application": application,
+            "buttons": get_buttons()
+        }
+    }
+
+    data_str = encode(data, unpicklable=False)
+    data_str = (
+        data_str.replace('"x_pos"', '"x"')
+        .replace('"y_pos"', '"y"')
+        .replace('"platform_version"', '"platformVersion"')
+    )
+
+    # Broadcast
+    await websocket_broadcast(data_str)
+
+
 #
 #   Functions
 #
@@ -345,6 +369,8 @@ async def start_server_async(host: str = "0.0.0.0", port: int = PLUGIN_PORT):
     site = web.TCPSite(runner, host, port)
     await site.start()
     print("Started Stream Deck API server on port", PLUGIN_PORT)
+
+    Timer(10, broadcast_status)
 
 
 def get_position(deck: StreamDeck, key: int) -> SDButtonPosition:
@@ -477,6 +503,24 @@ def start_ssdp_server():
     print("Starting SSDP server ...")
     server = SSDPServer(SD_SSDP)
     server.serve_forever()
+
+
+class Timer:
+    """Timer class."""
+    def __init__(self, interval, callback):
+        """Init timer."""
+        self._interval = interval
+        self._callback = callback
+        self._task = asyncio.ensure_future(self._job())
+
+    async def _job(self):
+        await asyncio.sleep(self._interval)
+        await self._callback()
+        self._task = asyncio.ensure_future(self._job())
+
+    def cancel(self):
+        """Cancel timer."""
+        self._task.cancel()
 
 
 def start():
