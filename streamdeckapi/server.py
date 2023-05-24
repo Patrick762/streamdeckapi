@@ -110,7 +110,7 @@ def save_button(key: int, button: SDButton):
     database.close()
 
 
-def get_button(key: int) -> SDButton | None:
+def get_button(key: int) -> any:
     """Get a button from the database."""
     database = sqlite3.connect(DB_FILE)
     cursor = database.cursor()
@@ -134,7 +134,7 @@ def get_button(key: int) -> SDButton | None:
     return button
 
 
-def get_button_by_uuid(uuid: str) -> SDButton | None:
+def get_button_by_uuid(uuid: str) -> any:
     """Get a button from the database."""
     database = sqlite3.connect(DB_FILE)
     cursor = database.cursor()
@@ -220,7 +220,7 @@ def write_button_state(key: int, state: bool, update: str):
     database.close()
 
 
-def get_button_state(key: int) -> tuple | None:
+def get_button_state(key: int) -> any:
     """Load button_state from database."""
     result = ()
     database = sqlite3.connect(DB_FILE)
@@ -265,7 +265,7 @@ async def api_icon_get_handler(request: web.Request):
     """Handle icon get requests."""
     uuid = request.match_info["uuid"]
     button = get_button_by_uuid(uuid)
-    if button is None:
+    if not isinstance(button, SDButton):
         return web.Response(status=404, text="Button not found")
     return web.Response(text=button.svg, content_type="image/svg+xml")
 
@@ -279,7 +279,7 @@ async def api_icon_set_handler(request: web.Request):
     if not body.startswith("<svg"):
         return web.Response(status=422, text="Only svgs are supported")
     button = get_button_by_uuid(uuid)
-    if button is None:
+    if not isinstance(button, SDButton):
         return web.Response(status=404, text="Button not found")
 
     # Update icon
@@ -381,7 +381,7 @@ def get_position(deck: StreamDeck, key: int) -> SDButtonPosition:
 async def on_key_change(_: StreamDeck, key: int, state: bool):
     """Handle key change callbacks."""
     button = get_button(key)
-    if button is None:
+    if not isinstance(button, SDButton):
         return
 
     if state is True:
@@ -395,7 +395,7 @@ async def on_key_change(_: StreamDeck, key: int, state: bool):
 
     db_button_state = get_button_state(key)
 
-    if db_button_state is None:
+    if not isinstance(db_button_state, tuple):
         write_button_state(key, state, now.strftime(DATETIME_FORMAT))
         return
 
@@ -431,7 +431,7 @@ def update_button_icon(uuid: str, svg: str):
 
         button = get_button_by_uuid(uuid)
         button_key = get_button_key(uuid)
-        if button is not None and button_key >= 0:
+        if isinstance(button, SDButton) and button_key >= 0:
             set_icon(deck, button_key, svg)
             button.svg = svg
             save_button(button_key, button)
@@ -478,7 +478,7 @@ def init_all():
         for key in range(deck.key_count()):
             # Only add if not already in dict
             button = get_button(key)
-            if button is None:
+            if not isinstance(button, SDButton):
                 position = get_position(deck, key)
                 new_button = SDButton(
                     {

@@ -96,7 +96,7 @@ class SDWebsocketMessage:
     """Stream Deck Websocket Message Type."""
 
     event: str
-    args: SDInfo | str | dict
+    args: any
 
     def __init__(self, obj: dict) -> None:
         """Init Stream Deck Websocket Message object."""
