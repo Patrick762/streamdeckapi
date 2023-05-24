@@ -314,7 +314,7 @@ async def websocket_handler(request: web.Request):
 
 async def websocket_broadcast(message: str):
     """Send a message to each websocket client."""
-    print(f"BROADCAST to {len(websocket_connections)} clients: {message}")
+    print(f"Broadcast to {len(websocket_connections)} clients")
     for connection in websocket_connections:
         await connection.send_str(message)
 
