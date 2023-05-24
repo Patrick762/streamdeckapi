@@ -36,5 +36,7 @@ Reload access rules:
 Install the package:
 `pip install streamdeckapi`
 
+Reboot your system
+
 Start the server:
 `streamdeckapi-server`

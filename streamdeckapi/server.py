@@ -58,6 +58,8 @@ application: SDApplication = SDApplication(
 devices: list[SDDevice] = []
 websocket_connections: list[web.WebSocketResponse] = []
 
+streamdecks: list[StreamDeck] = DeviceManager().enumerate()
+
 #
 #   Database
 #
@@ -422,12 +424,12 @@ async def on_key_change(_: StreamDeck, key: int, state: bool):
 
 def update_button_icon(uuid: str, svg: str):
     """Update a button icon."""
-    streamdecks: list[StreamDeck] = DeviceManager().enumerate()
     for deck in streamdecks:
         if not deck.is_visual():
             continue
 
-        deck.open()
+        if not deck.is_open():
+            deck.open()
 
         button = get_button_by_uuid(uuid)
         button_key = get_button_key(uuid)
@@ -442,9 +444,6 @@ def set_icon(deck: StreamDeck, key: int, svg: str):
     png_bytes = io.BytesIO()
     cairosvg.svg2png(svg.encode("utf-8"), write_to=png_bytes)
 
-    # Debug
-    cairosvg.svg2png(svg.encode("utf-8"), write_to=f"icon_{key}.png")
-
     icon = Image.open(png_bytes)
     image = PILHelper.create_scaled_image(deck, icon)
 
@@ -453,7 +452,6 @@ def set_icon(deck: StreamDeck, key: int, svg: str):
 
 def init_all():
     """Init Stream Deck devices."""
-    streamdecks: list[StreamDeck] = DeviceManager().enumerate()
     print(f"Found {len(streamdecks)} Stream Deck(s).")
 
     for deck in streamdecks:
