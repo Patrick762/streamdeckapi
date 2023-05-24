@@ -9,11 +9,9 @@ import requests
 from websockets.client import connect
 from websockets.exceptions import WebSocketException
 
-from .types import SDInfo, SDWebsocketMessage
+from streamdeckapi.const import PLUGIN_ICON, PLUGIN_INFO, PLUGIN_PORT
 
-_PLUGIN_PORT = 6153
-_PLUGIN_INFO = "/sd/info"
-_PLUGIN_ICON = "/sd/icon"
+from .types import SDInfo, SDWebsocketMessage
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,17 +51,17 @@ class StreamDeckApi:
     @property
     def _info_url(self) -> str:
         """URL to info endpoint."""
-        return f"http://{self._host}:{_PLUGIN_PORT}{_PLUGIN_INFO}"
+        return f"http://{self._host}:{PLUGIN_PORT}{PLUGIN_INFO}"
 
     @property
     def _icon_url(self) -> str:
         """URL to icon endpoint."""
-        return f"http://{self._host}:{_PLUGIN_PORT}{_PLUGIN_ICON}/"
+        return f"http://{self._host}:{PLUGIN_PORT}{PLUGIN_ICON}/"
 
     @property
     def _websocket_url(self) -> str:
         """URL to websocket."""
-        return f"ws://{self._host}:{_PLUGIN_PORT}"
+        return f"ws://{self._host}:{PLUGIN_PORT}"
 
     #
     #   API Methods
@@ -92,7 +90,8 @@ class StreamDeckApi:
         try:
             res = requests.post(url, data, headers=headers, timeout=5)
         except requests.RequestException:
-            _LOGGER.debug("Error sending data to Stream Deck Plugin (exception)")
+            _LOGGER.debug(
+                "Error sending data to Stream Deck Plugin (exception)")
             return None
         if res.status_code != 200:
             _LOGGER.debug(
@@ -121,7 +120,8 @@ class StreamDeckApi:
         try:
             info = SDInfo(rjson)
         except KeyError:
-            _LOGGER.debug("Error parsing response from %s to SDInfo", self._info_url)
+            _LOGGER.debug(
+                "Error parsing response from %s to SDInfo", self._info_url)
             return None
         return info
 
@@ -180,7 +180,8 @@ class StreamDeckApi:
         try:
             datajson = json.loads(msg)
         except json.JSONDecodeError:
-            _LOGGER.debug("Method _on_message: Websocket message couldn't get parsed")
+            _LOGGER.debug(
+                "Method _on_message: Websocket message couldn't get parsed")
             return
         try:
             data = SDWebsocketMessage(datajson)
@@ -195,18 +196,17 @@ class StreamDeckApi:
         if self._on_ws_message is not None:
             self._on_ws_message(data)
 
-        match data.event:
-            case "keyDown":
-                self._on_button_change(data.args, True)
-            case "keyUp":
-                self._on_button_change(data.args, False)
-            case "status":
-                self._on_ws_status_update(data.args)
-            case _:
-                _LOGGER.debug(
-                    "Method _on_message: Unknown event from Stream Deck Plugin received (Event: %s)",
-                    data.event,
-                )
+        if data.event == "keyDown":
+            self._on_button_change(data.args, True)
+        elif data.event == "keyUp":
+            self._on_button_change(data.args, False)
+        elif data.event == "status":
+            self._on_ws_status_update(data.args)
+        else:
+            _LOGGER.debug(
+                "Method _on_message: Unknown event from Stream Deck Plugin received (Event: %s)",
+                data.event,
+            )
 
     async def _websocket_loop(self):
         """Start the websocket client loop."""
@@ -226,7 +226,8 @@ class StreamDeckApi:
                                 )
                                 self._on_message(data)
                             await websocket.close()
-                            _LOGGER.debug("Method _websocket_loop: Websocket closed")
+                            _LOGGER.debug(
+                                "Method _websocket_loop: Websocket closed")
                         except WebSocketException:
                             _LOGGER.debug(
                                 "Method _websocket_loop: Websocket client crashed. Restarting it"

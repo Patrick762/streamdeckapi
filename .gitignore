@@ -1,1 +1,6 @@
 **/__pycache__/
+build
+*.egg-info
+*.db
+*.db-journal
+*.png
