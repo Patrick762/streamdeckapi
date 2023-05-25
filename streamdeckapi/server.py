@@ -6,6 +6,8 @@ import asyncio
 import platform
 import sqlite3
 import base64
+import socket
+from uuid import uuid4
 from datetime import datetime
 from multiprocessing import Process
 import aiohttp
@@ -496,15 +498,47 @@ def init_all():
         deck.set_key_callback_async(on_key_change)
 
 
+def get_local_ip():
+    """Get local ip address."""
+    connection = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        connection.connect(('192.255.255.255', 1))
+        address = connection.getsockname()[0]
+    except socket.error:
+        address = '127.0.0.1'
+    finally:
+        connection.close()
+    return address
+
+
 def start_ssdp_server():
     """Start SSDP server."""
     print("Starting SSDP server ...")
-    server = SSDPServer(SD_SSDP)
+
+    address = get_local_ip()
+    broadcast = "239.255.255.250"
+    location = f"http://{address}:{PLUGIN_PORT}/device.xml"
+    usn = f"uuid:{str(uuid4())}::{SD_SSDP}"
+    server = "python/3 UPnP/1.1 ssdpy/0.4.1"
+
+    print(f"IP Address for SSDP: {address}")
+    print(f"SSDP broadcast ip: {broadcast}")
+    print(f"SSDP location: {location}")
+
+    server = SSDPServer(usn,
+                        address=broadcast,
+                        location=location,
+                        max_age=1800,
+                        extra_fields={
+                            "st": SD_SSDP,
+                            "server": server
+                        })
     server.serve_forever()
 
 
 class Timer:
     """Timer class."""
+
     def __init__(self, interval, callback):
         """Init timer."""
         self._interval = interval
