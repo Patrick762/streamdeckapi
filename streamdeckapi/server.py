@@ -50,8 +50,8 @@ DEFAULT_ICON = re.sub(
 
 application: SDApplication = SDApplication(
     {
-        "font": "",
-        "language": "",
+        "font": "Segoe UI",
+        "language": "en",
         "platform": platform.system(),
         "platformVersion": platform.version(),
         "version": "0.0.1",
@@ -484,7 +484,7 @@ def init_all():
                     {
                         "uuid": hri.get_new_id().lower().replace(" ", "-"),
                         "device": serial,
-                        "position": {"x": position.x_pos, "y": position.y_pos},
+                        "position": {"x": position.y_pos, "y": position.x_pos}, # bug in python library
                         "svg": DEFAULT_ICON,
                     }
                 )
@@ -525,7 +525,7 @@ def start_ssdp_server():
     print(f"SSDP broadcast ip: {broadcast}")
     print(f"SSDP location: {location}")
 
-    server = SSDPServer(usn,
+    server = SSDPServer(usn,    # FIXME socket.setsockopt(): no such device No such device
                         address=broadcast,
                         location=location,
                         max_age=1800,
