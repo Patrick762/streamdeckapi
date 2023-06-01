@@ -79,11 +79,12 @@ class SDInfo(dict):
     """Stream Deck Info Type."""
 
     application: SDApplication
-    devices: list[SDDevice] = []
-    buttons: dict[str, SDButton] = {}
 
     def __init__(self, obj: dict) -> None:
         """Init Stream Deck Info object."""
+        self.devices: list[SDDevice] = []
+        self.buttons: dict[str, SDButton] = {}
+
         dict.__init__(self, obj)
         self.application = SDApplication(obj["application"])
         for device in obj["devices"]:
