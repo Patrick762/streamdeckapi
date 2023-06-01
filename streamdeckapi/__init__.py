@@ -1,6 +1,6 @@
 """Stream Deck API."""
 
-import streamdeckapi.api
-import streamdeckapi.const
-import streamdeckapi.tools
-import streamdeckapi.types
+from streamdeckapi.api import *
+from streamdeckapi.const import *
+from streamdeckapi.tools import *
+from streamdeckapi.types import *
