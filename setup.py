@@ -22,9 +22,9 @@ setup(
     url="https://github.com/Patrick762/streamdeckapi",
     packages=find_packages(),
     install_requires=[
-        "requests==2.28.2",
+        "requests",
         "websockets==11.0.2",
-        "aiohttp==3.8.4",
+        "aiohttp>=3.8",
         "human-readable-ids==0.1.3",
         "jsonpickle==3.0.1",
         "streamdeck==0.9.3",
