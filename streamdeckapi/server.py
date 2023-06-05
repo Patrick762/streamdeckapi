@@ -6,6 +6,8 @@ import asyncio
 import platform
 import sqlite3
 import base64
+import socket
+from uuid import uuid4
 from datetime import datetime
 from multiprocessing import Process
 import aiohttp
@@ -48,8 +50,8 @@ DEFAULT_ICON = re.sub(
 
 application: SDApplication = SDApplication(
     {
-        "font": "",
-        "language": "",
+        "font": "Segoe UI",
+        "language": "en",
         "platform": platform.system(),
         "platformVersion": platform.version(),
         "version": "0.0.1",
@@ -380,6 +382,28 @@ def get_position(deck: StreamDeck, key: int) -> SDButtonPosition:
     return SDButtonPosition({"x": int(key / deck.KEY_COLS), "y": key % deck.KEY_COLS})
 
 
+async def long_press_callback(key: int):
+    """Handle callback after long press seconds."""
+    print("Long press detected")
+
+    # Check state of button
+    for deck in streamdecks:
+        if not deck.is_visual():
+            continue
+
+        if not deck.is_open():
+            deck.open()
+
+        states = deck.key_states()
+
+        button = get_button(key)
+        if not isinstance(button, SDButton):
+            return
+
+        if states[key] is True:
+            await websocket_broadcast(encode({"event": "longPress", "args": button.uuid}))
+
+
 async def on_key_change(_: StreamDeck, key: int, state: bool):
     """Handle key change callbacks."""
     button = get_button(key)
@@ -389,6 +413,9 @@ async def on_key_change(_: StreamDeck, key: int, state: bool):
     if state is True:
         await websocket_broadcast(encode(
             {"event": "keyDown", "args": button.uuid}))
+        print("Waiting for button release")
+        # Start timer
+        Timer(LONG_PRESS_SECONDS, lambda: long_press_callback(key), False)
     else:
         await websocket_broadcast(encode(
             {"event": "keyUp", "args": button.uuid}))
@@ -409,13 +436,6 @@ async def on_key_change(_: StreamDeck, key: int, state: bool):
     if last_state is True and state is False and diff.seconds < LONG_PRESS_SECONDS:
         await websocket_broadcast(
             encode({"event": "singleTap", "args": button.uuid}))
-        write_button_state(key, state, now.strftime(DATETIME_FORMAT))
-        return
-
-    # TODO: Work with timer instead
-    if last_state is True and state is False and diff.seconds >= LONG_PRESS_SECONDS:
-        await websocket_broadcast(
-            encode({"event": "longPress", "args": button.uuid}))
         write_button_state(key, state, now.strftime(DATETIME_FORMAT))
         return
 
@@ -482,7 +502,7 @@ def init_all():
                     {
                         "uuid": hri.get_new_id().lower().replace(" ", "-"),
                         "device": serial,
-                        "position": {"x": position.x_pos, "y": position.y_pos},
+                        "position": {"x": position.y_pos, "y": position.x_pos},
                         "svg": DEFAULT_ICON,
                     }
                 )
@@ -496,25 +516,60 @@ def init_all():
         deck.set_key_callback_async(on_key_change)
 
 
+def get_local_ip():
+    """Get local ip address."""
+    connection = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        connection.connect(('192.255.255.255', 1))
+        address = connection.getsockname()[0]
+    except socket.error:
+        address = '127.0.0.1'
+    finally:
+        connection.close()
+    return address
+
+
 def start_ssdp_server():
     """Start SSDP server."""
     print("Starting SSDP server ...")
-    server = SSDPServer(SD_SSDP)
+
+    address = get_local_ip()
+    broadcast = "239.255.255.250"
+    location = f"http://{address}:{PLUGIN_PORT}/device.xml"
+    usn = f"uuid:{str(uuid4())}::{SD_SSDP}"
+    server = "python/3 UPnP/1.1 ssdpy/0.4.1"
+
+    print(f"IP Address for SSDP: {address}")
+    print(f"SSDP broadcast ip: {broadcast}")
+    print(f"SSDP location: {location}")
+
+    server = SSDPServer(usn,    # FIXME socket.setsockopt(): no such device No such device
+                        address=broadcast,
+                        location=location,
+                        max_age=1800,
+                        extra_fields={
+                            "st": SD_SSDP,
+                            "server": server,
+                            "deviceType": SD_SSDP,
+                        })
     server.serve_forever()
 
 
 class Timer:
     """Timer class."""
-    def __init__(self, interval, callback):
+
+    def __init__(self, interval, callback, repeating=True):
         """Init timer."""
         self._interval = interval
         self._callback = callback
+        self._repeating = repeating
         self._task = asyncio.ensure_future(self._job())
 
     async def _job(self):
         await asyncio.sleep(self._interval)
         await self._callback()
-        self._task = asyncio.ensure_future(self._job())
+        if self._repeating:
+            self._task = asyncio.ensure_future(self._job())
 
     def cancel(self):
         """Cancel timer."""

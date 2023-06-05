@@ -5,9 +5,6 @@ Stream Deck API Library for Home Assistant Stream Deck Integration
 
 Only compatible with separate [Stream Deck Plugin](https://github.com/Patrick762/streamdeckapi-plugin) or the bundled server.
 
-## Dependencies
-- [websockets](https://pypi.org/project/websockets/) 11.0.2
-
 ## Server
 This library also contains a server to use the streamdeck with Linux or without the official Stream Deck Software.
 
@@ -17,6 +14,9 @@ For this to work, the following software is required:
 - cairo [Installation instructions for Windows](https://stackoverflow.com/a/73913080)
 
 The event `doubleTap` is not working with this server software.
+
+### Limitations
+Discovery over SSDP might not work.
 
 ### Installation on Linux / Raspberry Pi
 
