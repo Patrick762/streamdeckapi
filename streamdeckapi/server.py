@@ -484,7 +484,7 @@ def init_all():
                     {
                         "uuid": hri.get_new_id().lower().replace(" ", "-"),
                         "device": serial,
-                        "position": {"x": position.y_pos, "y": position.x_pos}, # bug in python library
+                        "position": {"x": position.y_pos, "y": position.x_pos},
                         "svg": DEFAULT_ICON,
                     }
                 )
@@ -531,7 +531,8 @@ def start_ssdp_server():
                         max_age=1800,
                         extra_fields={
                             "st": SD_SSDP,
-                            "server": server
+                            "server": server,
+                            "deviceType": SD_SSDP,
                         })
     server.serve_forever()
 
