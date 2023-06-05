@@ -384,24 +384,25 @@ def get_position(deck: StreamDeck, key: int) -> SDButtonPosition:
 
 async def long_press_callback(key: int):
     """Handle callback after long press seconds."""
-    print("Long press detected")
+
+    button = get_button(key)
+
+    now = datetime.now()
 
     # Check state of button
-    for deck in streamdecks:
-        if not deck.is_visual():
-            continue
+    db_button_state = get_button_state(key)
 
-        if not deck.is_open():
-            deck.open()
+    if not isinstance(db_button_state, tuple):
+        print("ERROR reading state")
+        return
 
-        states = deck.key_states()
+    last_update: str = db_button_state[1]
+    last_update_datetime = datetime.strptime(last_update, DATETIME_FORMAT)
+    diff = now - last_update_datetime
 
-        button = get_button(key)
-        if not isinstance(button, SDButton):
-            return
-
-        if states[key] is True:
-            await websocket_broadcast(encode({"event": "longPress", "args": button.uuid}))
+    if db_button_state[0] is True and diff.seconds >= LONG_PRESS_SECONDS:
+        print("Long press detected")
+        await websocket_broadcast(encode({"event": "longPress", "args": button.uuid}))
 
 
 async def on_key_change(_: StreamDeck, key: int, state: bool):
@@ -428,18 +429,16 @@ async def on_key_change(_: StreamDeck, key: int, state: bool):
         write_button_state(key, state, now.strftime(DATETIME_FORMAT))
         return
 
+    write_button_state(key, state, now.strftime(DATETIME_FORMAT))
+
     last_state: bool = db_button_state[0]
     last_update: str = db_button_state[1]
     last_update_datetime = datetime.strptime(last_update, DATETIME_FORMAT)
     diff = now - last_update_datetime
 
     if last_state is True and state is False and diff.seconds < LONG_PRESS_SECONDS:
-        await websocket_broadcast(
-            encode({"event": "singleTap", "args": button.uuid}))
-        write_button_state(key, state, now.strftime(DATETIME_FORMAT))
-        return
-
-    write_button_state(key, state, now.strftime(DATETIME_FORMAT))
+        print("Single Tap detected")
+        await websocket_broadcast(encode({"event": "singleTap", "args": button.uuid}))
 
 
 def update_button_icon(uuid: str, svg: str):
