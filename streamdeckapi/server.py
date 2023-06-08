@@ -7,9 +7,9 @@ import platform
 import sqlite3
 import base64
 import socket
+from concurrent.futures import ProcessPoolExecutor
 from uuid import uuid4
 from datetime import datetime
-from multiprocessing import Process
 import aiohttp
 import human_readable_ids as hri
 from jsonpickle import encode
@@ -19,7 +19,7 @@ from StreamDeck.Devices.StreamDeck import StreamDeck
 from StreamDeck.ImageHelpers import PILHelper
 import cairosvg
 from PIL import Image
-from ssdpy import SSDPServer
+import ssdp
 
 from streamdeckapi.const import (
     DATETIME_FORMAT,
@@ -528,30 +528,58 @@ def get_local_ip():
     return address
 
 
-def start_ssdp_server():
-    """Start SSDP server."""
-    print("Starting SSDP server ...")
+class StreamDeckApiSsdpProtocol(ssdp.SimpleServiceDiscoveryProtocol):
+    """Protocol to handle responses and requests."""
 
-    address = get_local_ip()
-    broadcast = "239.255.255.250"
-    location = f"http://{address}:{PLUGIN_PORT}/device.xml"
-    usn = f"uuid:{str(uuid4())}::{SD_SSDP}"
-    server = "python/3 UPnP/1.1 ssdpy/0.4.1"
+    def response_received(self, response: ssdp.SSDPResponse, addr: tuple):
+        """Handle an incoming response."""
+        print("received response: %s %s %s", response.status_code,
+              response.reason, response.version)
 
-    print(f"IP Address for SSDP: {address}")
-    print(f"SSDP broadcast ip: {broadcast}")
-    print(f"SSDP location: {location}")
+        for header in response.headers:
+            print("header: %s", header)
 
-    server = SSDPServer(usn,    # FIXME socket.setsockopt(): no such device No such device
-                        address=broadcast,
-                        location=location,
-                        max_age=1800,
-                        extra_fields={
-                            "st": SD_SSDP,
-                            "server": server,
-                            "deviceType": SD_SSDP,
-                        })
-    server.serve_forever()
+        print()
+
+    def request_received(self, request: ssdp.SSDPRequest, addr: tuple):
+        """Handle an incoming request and respond to it."""
+        print(
+            "received request: %s %s %s",
+            request.method, request.uri, request.version
+
+        )
+
+        for header in request.headers:
+            print("header: %s", header)
+
+        print()
+
+        # Build response and send it.
+        print("Sending a response back to %s:%s", *addr)
+
+        address = get_local_ip()
+        location = f"http://example.net:{PLUGIN_PORT}/device.xml"
+        usn = f"uuid:{str(uuid4())}::{SD_SSDP}"
+        server = "python/3 UPnP/1.1 ssdpy/0.4.1"
+
+        print(f"IP Address for SSDP: {address}")
+        print(f"SSDP location: {location}")
+
+        ssdp_response = ssdp.SSDPResponse(
+            200,
+            "OK",
+            headers={
+                "Cache-Control": "max-age=30",
+                "Location": location,
+                "Server": server,
+                "ST": SD_SSDP,
+                "USN": usn,
+                "EXT": "",
+            },
+        )
+
+        msg = bytes(ssdp_response) + b"\r\n" + b"\r\n"
+        self.transport.sendto(msg, addr)
 
 
 class Timer:
@@ -579,13 +607,30 @@ def start():
     """Entrypoint."""
     init_all()
 
+    executor = ProcessPoolExecutor(2)
+    loop = asyncio.get_event_loop()
+
     # SSDP server
-    ssdp_server = Process(target=start_ssdp_server)
-    ssdp_server.start()
+    if platform.system() == "Windows":
+        print("SSDP not working on windows. Skipping ...")
+    else:
+        connect = loop.create_datagram_endpoint(
+            StreamDeckApiSsdpProtocol,
+            family=socket.AF_INET,
+            local_addr=(StreamDeckApiSsdpProtocol.MULTICAST_ADDRESS, 1900),
+        )
+        transport, protocol = loop.run_until_complete(connect)
+
+        StreamDeckApiSsdpProtocol.transport = transport
 
     # API server
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start_server_async())
-    loop.run_forever()
 
-    ssdp_server.join()
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+
+    transport.close()
+    loop.close()

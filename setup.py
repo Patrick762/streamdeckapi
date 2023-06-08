@@ -30,7 +30,7 @@ setup(
         "streamdeck==0.9.3",
         "pillow>=9.4.0,<10.0.0",
         "cairosvg==2.7.0",
-        "ssdpy==0.4.1",
+        "ssdp",
     ],
     keywords=[],
     entry_points={
