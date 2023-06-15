@@ -1,4 +1,5 @@
 """Stream Deck API types."""
+from typing import List, Dict
 
 
 class SDApplication:
@@ -82,8 +83,8 @@ class SDInfo(dict):
 
     def __init__(self, obj: dict) -> None:
         """Init Stream Deck Info object."""
-        self.devices: list[SDDevice] = []
-        self.buttons: dict[str, SDButton] = {}
+        self.devices: List[SDDevice] = []
+        self.buttons: Dict[str, SDButton] = {}
 
         dict.__init__(self, obj)
         self.application = SDApplication(obj["application"])

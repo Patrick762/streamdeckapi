@@ -1,7 +1,7 @@
 """Stream Deck API."""
 
 import asyncio
-from collections.abc import Callable
+from typing import Callable
 import json
 import logging
 
@@ -22,13 +22,44 @@ class StreamDeckApi:
     def __init__(
         self,
         host: str,
-        on_button_press: Callable[[str], None] | None = None,
-        on_button_release: Callable[[str], None] | None = None,
-        on_status_update: Callable[[SDInfo], None] | None = None,
-        on_ws_message: Callable[[SDWebsocketMessage], None] | None = None,
-        on_ws_connect: Callable[[], None] | None = None,
+        on_button_press: any = None,
+        on_button_release: any = None,
+        on_status_update: any = None,
+        on_ws_message: any = None,
+        on_ws_connect: any = None,
     ) -> None:
-        """Init Stream Deck API object."""
+        """Init Stream Deck API object.
+
+        Args:
+            on_button_press (Callable[[str], None] or None): Callback if button pressed
+            on_button_release (Callable[[str], None] or None): Callback if button released
+            on_status_update (Callable[[SDInfo], None] or None): Callback if status update received
+            on_ws_message (Callable[[SDWebsocketMessage], None] or None): Callback if websocket message received
+            on_ws_connect (Callable[[], None] or None): Callback on websocket connected
+        """
+
+        # Type checks
+        if on_button_press is not None and not isinstance(
+            on_button_press, Callable[[str], None]
+        ):
+            raise TypeError()
+        if on_button_release is not None and not isinstance(
+            on_button_release, Callable[[str], None]
+        ):
+            raise TypeError()
+        if on_status_update is not None and not isinstance(
+            on_status_update, Callable[[SDInfo], None]
+        ):
+            raise TypeError()
+        if on_ws_message is not None and not isinstance(
+            on_ws_message, Callable[[SDWebsocketMessage], None]
+        ):
+            raise TypeError()
+        if on_ws_connect is not None and not isinstance(
+            on_ws_connect, Callable[[], None]
+        ):
+            raise TypeError()
+
         self._host = host
         self._on_button_press = on_button_press
         self._on_button_release = on_button_release
@@ -37,7 +68,7 @@ class StreamDeckApi:
         self._on_ws_connect = on_ws_connect
         self._loop = asyncio.get_event_loop()
         self._running = False
-        self._task: asyncio.Task | None = None
+        self._task: any = None
 
     #
     #   Properties
@@ -68,8 +99,13 @@ class StreamDeckApi:
     #
 
     @staticmethod
-    def _get_request(url: str) -> None | requests.Response:
-        """Handle GET requests."""
+    def _get_request(url: str) -> any:
+        """Handle GET requests.
+
+        Returns:
+            requests.Response or None
+        """
+
         try:
             res = requests.get(url, timeout=5)
         except requests.RequestException:
@@ -85,13 +121,17 @@ class StreamDeckApi:
         return res
 
     @staticmethod
-    def _post_request(url: str, data: str, headers) -> None | requests.Response:
-        """Handle POST requests."""
+    def _post_request(url: str, data: str, headers) -> any:
+        """Handle POST requests.
+        
+        Returns:
+            requests.Response or None
+        """
+
         try:
             res = requests.post(url, data, headers=headers, timeout=5)
         except requests.RequestException:
-            _LOGGER.debug(
-                "Error sending data to Stream Deck Plugin (exception)")
+            _LOGGER.debug("Error sending data to Stream Deck Plugin (exception)")
             return None
         if res.status_code != 200:
             _LOGGER.debug(
@@ -101,9 +141,14 @@ class StreamDeckApi:
             return None
         return res
 
-    async def get_info(self, in_executor: bool = True) -> None | SDInfo:
-        """Get info about Stream Deck."""
-        res: requests.Response | None = None
+    async def get_info(self, in_executor: bool = True) -> any:
+        """Get info about Stream Deck.
+        
+        Returns:
+            SDInfo or None
+        """
+
+        res: any = None
         if in_executor:
             res = await self._loop.run_in_executor(
                 None, self._get_request, self._info_url
@@ -120,13 +165,17 @@ class StreamDeckApi:
         try:
             info = SDInfo(rjson)
         except KeyError:
-            _LOGGER.debug(
-                "Error parsing response from %s to SDInfo", self._info_url)
+            _LOGGER.debug("Error parsing response from %s to SDInfo", self._info_url)
             return None
         return info
 
-    async def get_icon(self, btn: str) -> None | str:
-        """Get svg icon from Stream Deck button."""
+    async def get_icon(self, btn: str) -> any:
+        """Get svg icon from Stream Deck button.
+        
+        Returns:
+            str or None
+        """
+
         url = f"{self._icon_url}{btn}"
         res = await self._loop.run_in_executor(None, self._get_request, url)
         if res is None or res.status_code != 200:
@@ -152,8 +201,14 @@ class StreamDeckApi:
     #   Websocket Methods
     #
 
-    def _on_button_change(self, uuid: str | dict, state: bool):
-        """Handle button down event."""
+    def _on_button_change(self, uuid: any, state: bool):
+        """Handle button down event.
+        
+        Args:
+            uuid (str or dict): UUID of the button
+            state (bool): State of the button
+        """
+
         if not isinstance(uuid, str):
             _LOGGER.debug("Method _on_button_change: uuid is not str")
             return
@@ -162,8 +217,13 @@ class StreamDeckApi:
         elif state is False and self._on_button_release is not None:
             self._on_button_release(uuid)
 
-    def _on_ws_status_update(self, info: SDInfo | str | dict):
-        """Handle Stream Deck status update event."""
+    def _on_ws_status_update(self, info: any):
+        """Handle Stream Deck status update event.
+        
+        Args:
+            info (SDInfo or str or dict): Stream Deck Info
+        """
+
         if not isinstance(info, SDInfo):
             _LOGGER.debug("Method _on_ws_status_update: info is not SDInfo")
             return
@@ -180,8 +240,7 @@ class StreamDeckApi:
         try:
             datajson = json.loads(msg)
         except json.JSONDecodeError:
-            _LOGGER.debug(
-                "Method _on_message: Websocket message couldn't get parsed")
+            _LOGGER.debug("Method _on_message: Websocket message couldn't get parsed")
             return
         try:
             data = SDWebsocketMessage(datajson)
@@ -226,8 +285,7 @@ class StreamDeckApi:
                                 )
                                 self._on_message(data)
                             await websocket.close()
-                            _LOGGER.debug(
-                                "Method _websocket_loop: Websocket closed")
+                            _LOGGER.debug("Method _websocket_loop: Websocket closed")
                         except WebSocketException:
                             _LOGGER.debug(
                                 "Method _websocket_loop: Websocket client crashed. Restarting it"

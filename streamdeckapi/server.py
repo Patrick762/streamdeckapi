@@ -1,5 +1,6 @@
 """Stream Deck API Server."""
 
+from concurrent.futures import ProcessPoolExecutor
 import re
 import io
 import asyncio
@@ -7,9 +8,8 @@ import platform
 import sqlite3
 import base64
 import socket
-from concurrent.futures import ProcessPoolExecutor
-from uuid import uuid4
 from datetime import datetime
+from typing import List, Dict
 import aiohttp
 import human_readable_ids as hri
 from jsonpickle import encode
@@ -19,7 +19,8 @@ from StreamDeck.Devices.StreamDeck import StreamDeck
 from StreamDeck.ImageHelpers import PILHelper
 import cairosvg
 from PIL import Image
-import ssdp
+from zeroconf import IPVersion, ServiceInfo, Zeroconf
+from zeroconf.asyncio import AsyncServiceInfo, AsyncZeroconf
 
 from streamdeckapi.const import (
     DATETIME_FORMAT,
@@ -28,7 +29,7 @@ from streamdeckapi.const import (
     PLUGIN_ICON,
     PLUGIN_INFO,
     PLUGIN_PORT,
-    SD_SSDP
+    SD_ZEROCONF,
 )
 from streamdeckapi.types import SDApplication, SDButton, SDButtonPosition, SDDevice
 
@@ -57,10 +58,10 @@ application: SDApplication = SDApplication(
         "version": "0.0.1",
     }
 )
-devices: list[SDDevice] = []
-websocket_connections: list[web.WebSocketResponse] = []
+devices: List[SDDevice] = []
+websocket_connections: List[web.WebSocketResponse] = []
 
-streamdecks: list[StreamDeck] = DeviceManager().enumerate()
+streamdecks: List[StreamDeck] = DeviceManager().enumerate()
 
 #
 #   Database
@@ -68,7 +69,8 @@ streamdecks: list[StreamDeck] = DeviceManager().enumerate()
 
 database_first = sqlite3.connect(DB_FILE)
 table_cursor = database_first.cursor()
-table_cursor.execute("""
+table_cursor.execute(
+    """
                 CREATE TABLE IF NOT EXISTS buttons(
                    key integer PRIMARY KEY,
                    uuid text NOT NULL,
@@ -76,13 +78,16 @@ table_cursor.execute("""
                    x integer,
                    y integer,
                    svg text
-                );""")
-table_cursor.execute("""
+                );"""
+)
+table_cursor.execute(
+    """
                 CREATE TABLE IF NOT EXISTS button_states(
                    key integer PRIMARY KEY,
                    state integer,
                    state_update text
-                );""")
+                );"""
+)
 table_cursor.execute("DELETE FROM button_states;")
 database_first.commit()
 table_cursor.close()
@@ -102,12 +107,12 @@ def save_button(key: int, button: SDButton):
     matching_buttons = result.fetchall()
     if len(matching_buttons) > 0:
         # Perform update
-        cursor.execute(
-            f"UPDATE buttons SET svg=\"{base64_string}\" WHERE key={key}")
+        cursor.execute(f'UPDATE buttons SET svg="{base64_string}" WHERE key={key}')
     else:
         # Create new row
         cursor.execute(
-            f"INSERT INTO buttons VALUES ({key}, \"{button.uuid}\", \"{button.device}\", {button.position.x_pos}, {button.position.y_pos}, \"{base64_string}\")")
+            f'INSERT INTO buttons VALUES ({key}, "{button.uuid}", "{button.device}", {button.position.x_pos}, {button.position.y_pos}, "{base64_string}")'
+        )
     database.commit()
     print(f"Saved button {button.uuid} with key {key} to database")
     cursor.close()
@@ -119,7 +124,8 @@ def get_button(key: int) -> any:
     database = sqlite3.connect(DB_FILE)
     cursor = database.cursor()
     result = cursor.execute(
-        f"SELECT key,uuid,device,x,y,svg FROM buttons WHERE key={key}")
+        f"SELECT key,uuid,device,x,y,svg FROM buttons WHERE key={key}"
+    )
     matching_buttons = result.fetchall()
     if len(matching_buttons) == 0:
         return None
@@ -127,12 +133,14 @@ def get_button(key: int) -> any:
     base64_bytes = row[5].encode()
     svg_bytes = base64.b64decode(base64_bytes)
     svg_string = svg_bytes.decode()
-    button = SDButton({
-        "uuid": row[1],
-        "device": row[2],
-        "position": {"x": row[3], "y": row[4]},
-        "svg": svg_string,
-    })
+    button = SDButton(
+        {
+            "uuid": row[1],
+            "device": row[2],
+            "position": {"x": row[3], "y": row[4]},
+            "svg": svg_string,
+        }
+    )
     cursor.close()
     database.close()
     return button
@@ -143,7 +151,8 @@ def get_button_by_uuid(uuid: str) -> any:
     database = sqlite3.connect(DB_FILE)
     cursor = database.cursor()
     result = cursor.execute(
-        f"SELECT key,uuid,device,x,y,svg FROM buttons WHERE uuid=\"{uuid}\"")
+        f'SELECT key,uuid,device,x,y,svg FROM buttons WHERE uuid="{uuid}"'
+    )
     matching_buttons = result.fetchall()
     if len(matching_buttons) == 0:
         return None
@@ -151,12 +160,14 @@ def get_button_by_uuid(uuid: str) -> any:
     base64_bytes = row[5].encode()
     svg_bytes = base64.b64decode(base64_bytes)
     svg_string = svg_bytes.decode()
-    button = SDButton({
-        "uuid": row[1],
-        "device": row[2],
-        "position": {"x": row[3], "y": row[4]},
-        "svg": svg_string,
-    })
+    button = SDButton(
+        {
+            "uuid": row[1],
+            "device": row[2],
+            "position": {"x": row[3], "y": row[4]},
+            "svg": svg_string,
+        }
+    )
     cursor.close()
     database.close()
     return button
@@ -166,7 +177,7 @@ def get_button_key(uuid: str) -> int:
     """Get a button key from the database."""
     database = sqlite3.connect(DB_FILE)
     cursor = database.cursor()
-    result = cursor.execute(f"SELECT key FROM buttons WHERE uuid=\"{uuid}\"")
+    result = cursor.execute(f'SELECT key FROM buttons WHERE uuid="{uuid}"')
     matching_buttons = result.fetchall()
     if len(matching_buttons) == 0:
         return -1
@@ -177,21 +188,23 @@ def get_button_key(uuid: str) -> int:
     return key
 
 
-def get_buttons() -> dict[str, SDButton]:
+def get_buttons() -> Dict[str, SDButton]:
     """Load all buttons from the database."""
-    result: dict[str, SDButton] = {}
+    result: Dict[str, SDButton] = {}
     database = sqlite3.connect(DB_FILE)
     cursor = database.cursor()
     for row in cursor.execute("SELECT key,uuid,device,x,y,svg FROM buttons"):
         base64_bytes = row[5].encode()
         svg_bytes = base64.b64decode(base64_bytes)
         svg_string = svg_bytes.decode()
-        result[row[0]] = SDButton({
-            "uuid": row[1],
-            "device": row[2],
-            "position": {"x": row[3], "y": row[4]},
-            "svg": svg_string,
-        })
+        result[row[0]] = SDButton(
+            {
+                "uuid": row[1],
+                "device": row[2],
+                "position": {"x": row[3], "y": row[4]},
+                "svg": svg_string,
+            }
+        )
     cursor.close()
     database.close()
     print(f"Loaded {len(result)} buttons from DB")
@@ -213,11 +226,13 @@ def write_button_state(key: int, state: bool, update: str):
     if len(matching_states) > 0:
         # Perform update
         cursor.execute(
-            f"UPDATE button_states SET state={state_int}, state_update=\"{update}\" WHERE key={key}")
+            f'UPDATE button_states SET state={state_int}, state_update="{update}" WHERE key={key}'
+        )
     else:
         # Create new row
         cursor.execute(
-            f"INSERT INTO button_states VALUES ({key}, {state_int}, \"{update}\")")
+            f'INSERT INTO button_states VALUES ({key}, {state_int}, "{update}")'
+        )
     database.commit()
     print(f"Saved button_state with key {key} to database")
     cursor.close()
@@ -230,7 +245,8 @@ def get_button_state(key: int) -> any:
     database = sqlite3.connect(DB_FILE)
     cursor = database.cursor()
     result = cursor.execute(
-        f"SELECT key,state,state_update FROM button_states WHERE key={key}")
+        f"SELECT key,state,state_update FROM button_states WHERE key={key}"
+    )
     matching_states = result.fetchall()
     if len(matching_states) == 0:
         return None
@@ -310,7 +326,8 @@ async def websocket_handler(request: web.Request):
                 await web_socket.close()
         elif msg.type == aiohttp.WSMsgType.ERROR:
             print(
-                f"Websocket connection closed with exception {web_socket.exception()}")
+                f"Websocket connection closed with exception {web_socket.exception()}"
+            )
 
     websocket_connections.remove(web_socket)
     return web_socket
@@ -332,8 +349,8 @@ async def broadcast_status():
         "args": {
             "devices": devices,
             "application": application,
-            "buttons": get_buttons()
-        }
+            "buttons": get_buttons(),
+        },
     }
 
     data_str = encode(data, unpicklable=False)
@@ -375,6 +392,7 @@ async def start_server_async(host: str = "0.0.0.0", port: int = PLUGIN_PORT):
     print("Started Stream Deck API server on port", PLUGIN_PORT)
 
     Timer(10, broadcast_status)
+    # TODO add check if websocket is used, otherwise display warning on streamdeck
 
 
 def get_position(deck: StreamDeck, key: int) -> SDButtonPosition:
@@ -412,14 +430,12 @@ async def on_key_change(_: StreamDeck, key: int, state: bool):
         return
 
     if state is True:
-        await websocket_broadcast(encode(
-            {"event": "keyDown", "args": button.uuid}))
+        await websocket_broadcast(encode({"event": "keyDown", "args": button.uuid}))
         print("Waiting for button release")
         # Start timer
         Timer(LONG_PRESS_SECONDS, lambda: long_press_callback(key), False)
     else:
-        await websocket_broadcast(encode(
-            {"event": "keyUp", "args": button.uuid}))
+        await websocket_broadcast(encode({"event": "keyUp", "args": button.uuid}))
 
     now = datetime.now()
 
@@ -515,73 +531,6 @@ def init_all():
         deck.set_key_callback_async(on_key_change)
 
 
-def get_local_ip():
-    """Get local ip address."""
-    connection = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        connection.connect(('192.255.255.255', 1))
-        address = connection.getsockname()[0]
-    except socket.error:
-        address = '127.0.0.1'
-    finally:
-        connection.close()
-    return address
-
-
-class StreamDeckApiSsdpProtocol(ssdp.SimpleServiceDiscoveryProtocol):
-    """Protocol to handle responses and requests."""
-
-    def response_received(self, response: ssdp.SSDPResponse, addr: tuple):
-        """Handle an incoming response."""
-        print("received response: %s %s %s", response.status_code,
-              response.reason, response.version)
-
-        for header in response.headers:
-            print("header: %s", header)
-
-        print()
-
-    def request_received(self, request: ssdp.SSDPRequest, addr: tuple):
-        """Handle an incoming request and respond to it."""
-        print(
-            "received request: %s %s %s",
-            request.method, request.uri, request.version
-
-        )
-
-        for header in request.headers:
-            print("header: %s", header)
-
-        print()
-
-        # Build response and send it.
-        print("Sending a response back to %s:%s", *addr)
-
-        address = get_local_ip()
-        location = f"http://example.net:{PLUGIN_PORT}/device.xml"
-        usn = f"uuid:{str(uuid4())}::{SD_SSDP}"
-        server = "python/3 UPnP/1.1 ssdpy/0.4.1"
-
-        print(f"IP Address for SSDP: {address}")
-        print(f"SSDP location: {location}")
-
-        ssdp_response = ssdp.SSDPResponse(
-            200,
-            "OK",
-            headers={
-                "Cache-Control": "max-age=30",
-                "Location": location,
-                "Server": server,
-                "ST": SD_SSDP,
-                "USN": usn,
-                "EXT": "",
-            },
-        )
-
-        msg = bytes(ssdp_response) + b"\r\n" + b"\r\n"
-        self.transport.sendto(msg, addr)
-
-
 class Timer:
     """Timer class."""
 
@@ -603,25 +552,32 @@ class Timer:
         self._task.cancel()
 
 
+def start_zeroconf():
+    """Start Zeroconf server."""
+
+    info = ServiceInfo(
+        SD_ZEROCONF,
+        f"Stream Deck API Server.{SD_ZEROCONF}",
+        addresses=[socket.inet_aton("127.0.0.1")],
+        port=80,
+    )
+
+    zeroconf = Zeroconf()
+
+    print("Zeroconf starting")
+
+    zeroconf.register_service(info)
+
+
 def start():
     """Entrypoint."""
     init_all()
 
-    executor = ProcessPoolExecutor(2)
     loop = asyncio.get_event_loop()
+    executor = ProcessPoolExecutor(2)
 
-    # SSDP server
-    if platform.system() == "Windows":
-        print("SSDP not working on windows. Skipping ...")
-    else:
-        connect = loop.create_datagram_endpoint(
-            StreamDeckApiSsdpProtocol,
-            family=socket.AF_INET,
-            local_addr=(StreamDeckApiSsdpProtocol.MULTICAST_ADDRESS, 1900),
-        )
-        transport, protocol = loop.run_until_complete(connect)
-
-        StreamDeckApiSsdpProtocol.transport = transport
+    # Zeroconf server
+    loop.run_in_executor(executor, start_zeroconf)
 
     # API server
     loop = asyncio.get_event_loop()
@@ -632,5 +588,4 @@ def start():
     except KeyboardInterrupt:
         pass
 
-    transport.close()
     loop.close()
