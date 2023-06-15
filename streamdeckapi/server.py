@@ -574,7 +574,7 @@ class StreamDeckApiSsdpProtocol(ssdp.SimpleServiceDiscoveryProtocol):
         print("Sending a response back to %s:%s", *addr)
 
         address = get_local_ip()
-        location = f"http://example.net:{PLUGIN_PORT}/device.xml"
+        location = f"http://{address}:{PLUGIN_PORT}/device.xml"
         usn = f"uuid:{str(uuid4())}::{SD_SSDP}"
         server = "python/3 UPnP/1.1 ssdpy/0.4.1"
 

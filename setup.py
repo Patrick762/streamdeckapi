@@ -9,7 +9,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with codecs.open(os.path.join(here, "README.md"), encoding="utf-8") as fh:
     long_description = "\n" + fh.read()
 
-VERSION = "0.0.7"
+VERSION = "0.0.8"
 DESCRIPTION = "Stream Deck API Library"
 
 # Setting up
@@ -32,7 +32,7 @@ setup(
         "streamdeck==0.9.3",
         "pillow>=9.4.0,<10.0.0",
         "cairosvg==2.7.0",
-        "ssdp",
+        "ssdp!=1.2.0",
     ],
     keywords=[],
     entry_points={
