@@ -32,7 +32,7 @@ setup(
         "streamdeck==0.9.3",
         "pillow>=9.4.0,<10.0.0",
         "cairosvg==2.7.0",
-        "ssdp!=1.2.0",
+        "zeroconf",
     ],
     keywords=[],
     entry_points={

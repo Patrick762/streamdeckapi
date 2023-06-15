@@ -1,5 +1,6 @@
 """Stream Deck API Server."""
 
+from concurrent.futures import ProcessPoolExecutor
 import re
 import io
 import asyncio
@@ -7,7 +8,6 @@ import platform
 import sqlite3
 import base64
 import socket
-from uuid import uuid4
 from datetime import datetime
 from typing import List, Dict
 import aiohttp
@@ -19,7 +19,8 @@ from StreamDeck.Devices.StreamDeck import StreamDeck
 from StreamDeck.ImageHelpers import PILHelper
 import cairosvg
 from PIL import Image
-import ssdp
+from zeroconf import IPVersion, ServiceInfo, Zeroconf
+from zeroconf.asyncio import AsyncServiceInfo, AsyncZeroconf
 
 from streamdeckapi.const import (
     DATETIME_FORMAT,
@@ -28,7 +29,7 @@ from streamdeckapi.const import (
     PLUGIN_ICON,
     PLUGIN_INFO,
     PLUGIN_PORT,
-    SD_SSDP,
+    SD_ZEROCONF,
 )
 from streamdeckapi.types import SDApplication, SDButton, SDButtonPosition, SDDevice
 
@@ -391,6 +392,7 @@ async def start_server_async(host: str = "0.0.0.0", port: int = PLUGIN_PORT):
     print("Started Stream Deck API server on port", PLUGIN_PORT)
 
     Timer(10, broadcast_status)
+    # TODO add check if websocket is used, otherwise display warning on streamdeck
 
 
 def get_position(deck: StreamDeck, key: int) -> SDButtonPosition:
@@ -529,75 +531,6 @@ def init_all():
         deck.set_key_callback_async(on_key_change)
 
 
-def get_local_ip():
-    """Get local ip address."""
-    connection = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        connection.connect(("192.255.255.255", 1))
-        address = connection.getsockname()[0]
-    except socket.error:
-        address = "127.0.0.1"
-    finally:
-        connection.close()
-    return address
-
-
-class StreamDeckApiSsdpProtocol(ssdp.SimpleServiceDiscoveryProtocol):
-    """Protocol to handle responses and requests."""
-
-    def response_received(self, response: ssdp.SSDPResponse, addr: tuple):
-        """Handle an incoming response."""
-        print(
-            "received response: %s %s %s",
-            response.status_code,
-            response.reason,
-            response.version,
-        )
-
-        for header in response.headers:
-            print("header: %s", header)
-
-        print()
-
-    def request_received(self, request: ssdp.SSDPRequest, addr: tuple):
-        """Handle an incoming request and respond to it."""
-        print(
-            "received request: %s %s %s", request.method, request.uri, request.version
-        )
-
-        for header in request.headers:
-            print("header: %s", header)
-
-        print()
-
-        # Build response and send it.
-        print("Sending a response back to %s:%s", *addr)
-
-        address = get_local_ip()
-        location = f"http://{address}:{PLUGIN_PORT}/device.xml"
-        usn = f"uuid:{str(uuid4())}::{SD_SSDP}"
-        server = "python/3 UPnP/1.1 ssdpy/0.4.1"
-
-        print(f"IP Address for SSDP: {address}")
-        print(f"SSDP location: {location}")
-
-        ssdp_response = ssdp.SSDPResponse(
-            200,
-            "OK",
-            headers={
-                "Cache-Control": "max-age=30",
-                "Location": location,
-                "Server": server,
-                "ST": SD_SSDP,
-                "USN": usn,
-                "EXT": "",
-            },
-        )
-
-        msg = bytes(ssdp_response) + b"\r\n" + b"\r\n"
-        self.transport.sendto(msg, addr)
-
-
 class Timer:
     """Timer class."""
 
@@ -619,24 +552,32 @@ class Timer:
         self._task.cancel()
 
 
+def start_zeroconf():
+    """Start Zeroconf server."""
+
+    info = ServiceInfo(
+        SD_ZEROCONF,
+        f"Stream Deck API Server.{SD_ZEROCONF}",
+        addresses=[socket.inet_aton("127.0.0.1")],
+        port=80,
+    )
+
+    zeroconf = Zeroconf()
+
+    print("Zeroconf starting")
+
+    zeroconf.register_service(info)
+
+
 def start():
     """Entrypoint."""
     init_all()
 
     loop = asyncio.get_event_loop()
+    executor = ProcessPoolExecutor(2)
 
-    # SSDP server
-    if platform.system() == "Windows":
-        print("SSDP not working on windows. Skipping ...")
-    else:
-        connect = loop.create_datagram_endpoint(
-            StreamDeckApiSsdpProtocol,
-            family=socket.AF_INET,
-            local_addr=(StreamDeckApiSsdpProtocol.MULTICAST_ADDRESS, 1900),
-        )
-        transport, _ = loop.run_until_complete(connect)
-
-        StreamDeckApiSsdpProtocol.transport = transport
+    # Zeroconf server
+    loop.run_in_executor(executor, start_zeroconf)
 
     # API server
     loop = asyncio.get_event_loop()
@@ -647,5 +588,4 @@ def start():
     except KeyboardInterrupt:
         pass
 
-    transport.close()
     loop.close()
