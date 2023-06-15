@@ -1,6 +1,8 @@
-from setuptools import setup, find_packages
-import codecs
+"""Setup for pypi package"""
+
 import os
+import codecs
+from setuptools import setup, find_packages
 
 here = os.path.abspath(os.path.dirname(__file__))
 
