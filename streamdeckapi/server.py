@@ -560,6 +560,8 @@ def start_zeroconf():
         f"Stream Deck API Server.{SD_ZEROCONF}",
         addresses=[socket.inet_aton("127.0.0.1")],
         port=80,
+        properties={'path': '/sd/info'},
+        server="pythonserver.local.",
     )
 
     zeroconf = Zeroconf()
