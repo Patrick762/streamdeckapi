@@ -23,7 +23,7 @@ pipwin install cairocffi
 The event `doubleTap` is not working with this server software.
 
 ### Limitations
-Discovery might not work.
+Slow icon updates on Raspberry Pi Zero
 
 ### Installation on Linux / Raspberry Pi
 
