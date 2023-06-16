@@ -19,8 +19,7 @@ from StreamDeck.Devices.StreamDeck import StreamDeck
 from StreamDeck.ImageHelpers import PILHelper
 import cairosvg
 from PIL import Image
-from zeroconf import IPVersion, ServiceInfo, Zeroconf
-from zeroconf.asyncio import AsyncServiceInfo, AsyncZeroconf
+from zeroconf import ServiceInfo, Zeroconf
 
 from streamdeckapi.const import (
     DATETIME_FORMAT,
@@ -559,7 +558,7 @@ def start_zeroconf():
         SD_ZEROCONF,
         f"Stream Deck API Server.{SD_ZEROCONF}",
         addresses=[socket.inet_aton("127.0.0.1")],
-        port=80,
+        port=PLUGIN_PORT,
         properties={'path': '/sd/info'},
         server="pythonserver.local.",
     )
