@@ -48,6 +48,25 @@ DEFAULT_ICON = re.sub(
 )
 
 
+# Copy of MDI Icon "alert"
+NO_CONN_ICON = re.sub(
+    "\r\n|\n|\r",
+    "",
+    """
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72">
+    <rect width="72" height="72" fill="#000" />
+    <g transform="translate(1, 1) scale(1)">
+
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+    <path fill="yellow" d="M13 14H11V9H13M13 18H11V16H13M1 21H23L12 2L1 21Z" />
+    </svg>
+
+    </g>
+    </svg>
+    """,
+)
+
+
 application: SDApplication = SDApplication(
     {
         "font": "Segoe UI",
@@ -382,6 +401,21 @@ def create_runner():
     return web.AppRunner(app)
 
 
+async def check_websocket():
+    """Check if a websocket client is connected."""
+    if len(websocket_connections) == 0:
+        print("No connection")
+        for deck in streamdecks:
+            if not deck.is_visual():
+                continue
+
+            if not deck.is_open():
+                deck.open()
+
+            for key in range(deck.key_count()):
+                set_icon(deck, key, NO_CONN_ICON)
+
+
 async def start_server_async(host: str = "0.0.0.0", port: int = PLUGIN_PORT):
     """Start API server."""
     runner = create_runner()
@@ -391,7 +425,7 @@ async def start_server_async(host: str = "0.0.0.0", port: int = PLUGIN_PORT):
     print("Started Stream Deck API server on port", PLUGIN_PORT)
 
     Timer(10, broadcast_status)
-    # TODO add check if websocket is used, otherwise display warning on streamdeck
+    Timer(3, check_websocket)
 
 
 def get_position(deck: StreamDeck, key: int) -> SDButtonPosition:
@@ -573,10 +607,10 @@ def start_zeroconf():
 
     info = ServiceInfo(
         SD_ZEROCONF,
-        f"Stream Deck API Server.{SD_ZEROCONF}",
+        f"Stream Deck API Server at {host}.{SD_ZEROCONF}",
         addresses=[socket.inet_aton(host)],
         port=PLUGIN_PORT,
-        properties={'path': '/sd/info'},
+        properties={"path": "/sd/info"},
         server="pythonserver.local.",
     )
 
