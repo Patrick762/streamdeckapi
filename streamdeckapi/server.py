@@ -551,13 +551,30 @@ class Timer:
         self._task.cancel()
 
 
+def get_local_ip():
+    """Get local ip address."""
+    connection = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        connection.connect(("192.255.255.255", 1))
+        address = connection.getsockname()[0]
+    except socket.error:
+        address = "127.0.0.1"
+    finally:
+        connection.close()
+    return address
+
+
 def start_zeroconf():
     """Start Zeroconf server."""
+
+    host = get_local_ip()
+
+    print("Using host", host, "for Zeroconf")
 
     info = ServiceInfo(
         SD_ZEROCONF,
         f"Stream Deck API Server.{SD_ZEROCONF}",
-        addresses=[socket.inet_aton("127.0.0.1")],
+        addresses=[socket.inet_aton(host)],
         port=PLUGIN_PORT,
         properties={'path': '/sd/info'},
         server="pythonserver.local.",
