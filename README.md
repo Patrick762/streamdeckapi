@@ -28,7 +28,7 @@ Slow icon updates on Raspberry Pi Zero
 ### Installation on Linux / Raspberry Pi
 
 Install requirements:
-`sudo apt install -y libudev-dev libusb-1.0-0-dev libhidapi-libusb0 libjpeg-dev zlib1g-dev libopenjp2-7 libtiff5`
+`sudo apt install -y libudev-dev libusb-1.0-0-dev libhidapi-libusb0 libjpeg-dev zlib1g-dev libopenjp2-7 libtiff5 libgtk-3-dev python3-pip`
 
 Allow all users non-root access to Stream Deck Devices:
 ```bash
