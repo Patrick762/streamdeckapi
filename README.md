@@ -47,3 +47,26 @@ Reboot your system
 
 Start the server:
 `streamdeckapi-server`
+
+### Example service
+To run the server on startup, you can use the following config in the file `/etc/systemd/system/streamdeckapi.service`:
+
+```conf
+[Unit]
+Description=Stream Deck API Service
+Wants=network-online.target
+After=network.target
+
+[Service]
+WorkingDirectory=/home/pi
+ExecStart=/home/pi/.local/bin/streamdeckapi-server
+User=pi
+StandardOutput=console
+
+[Install]
+WantedBy=multi-user.target
+```
+
+To start the service, run `sudo systemctl start streamdeckapi.service`.
+
+To enable the service, run `sudo systemctl enable streamdeckapi.service`.
