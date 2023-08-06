@@ -38,28 +38,6 @@ class StreamDeckApi:
             on_ws_connect (Callable[[], None] or None): Callback on websocket connected
         """
 
-        # Type checks
-        if on_button_press is not None and not isinstance(
-            on_button_press, Callable[[str], None]
-        ):
-            raise TypeError()
-        if on_button_release is not None and not isinstance(
-            on_button_release, Callable[[str], None]
-        ):
-            raise TypeError()
-        if on_status_update is not None and not isinstance(
-            on_status_update, Callable[[SDInfo], None]
-        ):
-            raise TypeError()
-        if on_ws_message is not None and not isinstance(
-            on_ws_message, Callable[[SDWebsocketMessage], None]
-        ):
-            raise TypeError()
-        if on_ws_connect is not None and not isinstance(
-            on_ws_connect, Callable[[], None]
-        ):
-            raise TypeError()
-
         self._host = host
         self._on_button_press = on_button_press
         self._on_button_release = on_button_release
