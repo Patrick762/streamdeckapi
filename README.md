@@ -5,7 +5,21 @@ Stream Deck API Library for Home Assistant Stream Deck Integration
 
 Only compatible with separate [Stream Deck Plugin](https://github.com/Patrick762/streamdeckapi-plugin) or the bundled server.
 
-## Server
+## Server inside docker container
+The docker image allows you to use the streamdeckapi server inside a docker container.
+
+### Usage
+```shell
+docker run -v /dev/hidraw7:/dev/hidraw7 -p 6153:6153 --privileged ghcr.io/patrick762/streamdeckapi
+```
+
+**Note:** You have to change `hidraw7` to the path of your Stream Deck. You can find this path by using `lshid` (https://pypi.org/project/lshid/).
+
+## Limitations
+- No zeroconf discovery
+- No `doubleTap` event
+
+## Server without docker
 This library also contains a server to use the streamdeck with Linux or without the official Stream Deck Software.
 
 For this to work, the following software is required:
@@ -21,7 +35,6 @@ pipwin install cairocffi
 ```
 
 ### Limitations
-- Slow icon updates on Raspberry Pi Zero
 - No `doubleTap` event
 
 ### Installation on Linux / Raspberry Pi
