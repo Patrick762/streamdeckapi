@@ -9,7 +9,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with codecs.open(os.path.join(here, "README.md"), encoding="utf-8") as fh:
     long_description = "\n" + fh.read()
 
-VERSION = "0.0.11"
+VERSION = "0.0.12"
 DESCRIPTION = "Stream Deck API Library"
 
 # Setting up
@@ -25,7 +25,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "requests",
-        "websockets==11.0.2",
+        "websockets>=13.1",
         "aiohttp>=3.8",
         "human-readable-ids==0.1.3",
         "jsonpickle==3.0.1",
