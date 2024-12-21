@@ -25,7 +25,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "requests",
-        "websockets==11.0.2",
+        "websockets>=13.1",
         "aiohttp>=3.8",
         "human-readable-ids==0.1.3",
         "jsonpickle==3.0.1",
