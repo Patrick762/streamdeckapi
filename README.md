@@ -10,7 +10,7 @@ The docker image allows you to use the streamdeckapi server inside a docker cont
 
 ### Usage
 ```shell
-docker run -v /dev/hidraw7:/dev/hidraw7 -p 6153:6153 --privileged ghcr.io/patrick762/streamdeckapi:main
+docker run -v /dev/hidraw7:/dev/hidraw7 -v ./data/streamdeckapi:/streamdeckapi/data -p 6153:6153 --privileged ghcr.io/patrick762/streamdeckapi:main
 ```
 
 **Note:** You have to change `hidraw7` to the path of your Stream Deck. You can find this path by using `lshid` (https://pypi.org/project/lshid/).
